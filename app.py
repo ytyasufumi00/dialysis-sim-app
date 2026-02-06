@@ -18,6 +18,8 @@ class DrugSimulation:
         
         # 消失速度定数 k_el の計算
         # 入力された半減期(T1/2)を、全身(V_total)からのクリアランスとみなして算出
+        # T1/2 = 0.693 * Vd / CL  => CL = 0.693 * Vd / T1/2
+        # k_el = CL / V1
         total_V = self.V1 + self.V2
         t_half_min = drug_params['T_half_hours'] * 60
         
@@ -83,54 +85,44 @@ def draw_explanation():
     st.markdown("---")
     st.header("📚 パラメータ解説と臨床的意義")
     
-    tab1, tab2, tab3 = st.tabs(["基礎知識 (Vd, KoA)", "各薬剤の特徴 (Key!)", "腎機能・半減期ガイド"])
+    tab1, tab2 = st.tabs(["各薬剤の半減期目安 (正常 vs 腎不全)", "シミュレーションの考え方"])
     
     with tab1:
-        st.markdown("""
-        ### 1. 分布容積 ($V_1, V_2$)
-        * **$V_1$ (中心室):** 血管内など、透析で直接浄化できる領域。
-        * **$V_2$ (末梢室):** 組織・細胞内。ここにある薬物は移動($Q$)してこないと除去できません。
+        st.markdown("### ⏱️ 半減期 ($T_{1/2}$) の入力目安")
+        st.markdown("患者の病態（腎機能廃絶や過量服薬）に合わせて、適切な半減期を選択して入力してください。")
         
-        ### 2. KoA (総括物質移動係数)
-        透析膜の性能指標（拡散しやすさ）。
-        * **800~1000 (超高効率):** メタノール、リチウム、尿素（小分子・非結合）
-        * **500~700 (高効率):** カフェイン、アシクロビル、バルプロ酸(遊離型)
-        * **< 400 (低効率):** 蛋白結合率が高い薬物（通常時のフェニトイン等）、巨大分子
-        """)
+        # データ定義
+        data = [
+            {"薬": "アシクロビル", "正常": "2.5 時間", "腎不全/中毒": "**20 時間**", "備考": "腎排泄型。腎不全で著明に延長。"},
+            {"薬": "リチウム", "正常": "18~24 時間", "腎不全/中毒": "**40~50+ 時間**", "備考": "腎排泄型。透析後のリバウンドが大。"},
+            {"薬": "メタノール", "正常": "2~3 時間", "腎不全/中毒": "**30~50+ 時間**", "備考": "代謝拮抗薬(ホメピゾール等)使用時は著明に延長。"},
+            {"薬": "カフェイン", "正常": "3~6 時間", "腎不全/中毒": "**10~100 時間**", "備考": "肝代謝。過量服薬による代謝飽和で延長。"},
+            {"薬": "バルプロ酸", "正常": "10~16 時間", "腎不全/中毒": "**~30 時間**", "備考": "肝代謝。中毒域で蛋白結合が外れ、透析効率UP。"},
+            {"薬": "カルバマゼピン", "正常": "10~20 時間", "腎不全/中毒": "**20~40 時間**", "備考": "肝代謝。徐放剤による吸収遅延・リバウンドに注意。"},
+        ]
+        st.table(data)
+        st.caption("※ 文献により数値には幅があります。中毒時は個体差が大きいため、最悪のケース（長い半減期）を想定するのが安全です。")
 
     with tab2:
-        st.info("薬剤ごとの挙動の違いに注目してください。")
-        
         st.markdown("""
-        #### 🔵 リチウム (Lithium)
-        * **特徴:** 細胞内に蓄積するため、血中($V_1$)から抜けても、細胞($V_2$)からゆっくり湧き出してきます。
-        * **挙動:** 透析終了後の**リバウンド（再上昇）が顕著**です。シミュレーションで終了1時間後の値を要確認。
-
-        #### 🟡 バルプロ酸 (Valproic Acid)
-        * **特徴:** 通常は蛋白結合率が高い(90%)ため透析で抜けにくいですが、**中毒域では結合が飽和し、遊離型が急増するため透析が著効します**。
-        * **設定:** KoAを高め(600~)に設定しています。
-
-        #### 🔴 メタノール (Methanol)
-        * **特徴:** 極めて分子が小さく水溶性。透析で劇的に抜けます。
-        * **注意:** 治療（ホメピゾール等）で代謝をブロックしている場合、半減期は**30〜50時間以上**になります。透析なしでは体から抜けません。
-
-        #### 🟠 カルバマゼピン (Carbamazepine)
-        * **特徴:** 活性代謝物の存在や、腸管からの再吸収もあり、リバウンドが有名です。蛋白結合率があるため、KoAはやや低めですが、長時間透析で総除去量を稼ぎます。
+        ### 📊 グラフの見方
+        * **Blood (With HD):** 透析を行った場合の血中濃度（赤実線）。
+        * **Tissue (With HD):** 透析を行った場合の組織内濃度（青破線）。これが高いままだと、透析後にリバウンドします。
+        * **Blood (No HD):** 透析をしなかった場合の自然経過（灰色点線）。透析の効果判定に使用します。
+        * **Tissue (No HD):** 透析をしなかった場合の組織内濃度（水色点線）。**【今回追加】**
+        
+        ### 💡 KoA (総括物質移動係数)
+        * **800~1000:** メタノール、リチウム（小分子・水溶性）→ 非常に抜けやすい
+        * **500~700:** カフェイン、アシクロビル、バルプロ酸（遊離型）→ 抜けやすい
+        * **< 400:** 蛋白結合率が高い薬物など → 抜けにくい
         """)
-
-    with tab3:
-        st.table({
-            "薬剤": ["Caffeine", "Acyclovir", "Carbamazepine", "Valproic Acid", "Methanol", "Lithium"],
-            "半減期目安 (Overdose時)": ["10~100h (代謝飽和)", "20h (腎不全)", "15~30h", "15~30h", "30~50h (代謝遮断時)", "24~36h (腎不全)"],
-            "透析効効率": ["高い", "高い", "中程度", "高濃度で高い", "極めて高い", "高い(リバウンド大)"]
-        })
 
 # ==========================================
 # 3. メインアプリケーション
 # ==========================================
 
 st.set_page_config(page_title="透析除去シミュレーター", layout="wide")
-st.title("💊 薬物過量投与 透析除去シミュレーター (拡張版)")
+st.title("💊 薬物過量投与 透析除去シミュレーター")
 
 # --- サイドバー設定 ---
 st.sidebar.header("1. 患者・透析条件")
@@ -138,33 +130,21 @@ weight = st.sidebar.number_input("患者体重 (kg)", value=60.0, step=1.0)
 qb = st.sidebar.slider("血流量 Qb (mL/min)", 100, 400, 200, step=10)
 qd = st.sidebar.slider("透析液流量 Qd (mL/min)", 300, 800, 500, step=50)
 hd_duration = st.sidebar.slider("透析時間 (時間)", 1, 12, 4) * 60
-hd_start = st.sidebar.number_input("服用から透析開始まで (分)", value=120, step=30, help="分布がある程度完了した時点を想定")
+hd_start = st.sidebar.number_input("服用から透析開始まで (分)", value=120, step=30)
 
 st.sidebar.header("2. 薬剤選択・設定")
 drug_list = ["Caffeine", "Acyclovir", "Carbamazepine", "Valproic Acid", "Methanol", "Lithium", "Custom"]
 drug_choice = st.sidebar.selectbox("対象薬剤", drug_list)
 
-# --- 薬剤パラメータ辞書 (Overdose / Renal Failure Scenario) ---
+# --- 薬剤パラメータ辞書 ---
+# 中毒時・腎不全時を想定したデフォルト値
 default_params = {
-    # カフェイン: 代謝飽和でT1/2延長、除去良好
     'Caffeine': {'V1': 0.2, 'V2': 0.4, 'Q': 0.5, 'T1/2': 15.0, 'KoA': 700, 'dose': 6000},
-    
-    # アシクロビル: 腎不全でT1/2著明延長、除去良好
-    'Acyclovir': {'V1': 0.15, 'V2': 0.55, 'Q': 0.2, 'T1/2': 20.0, 'KoA': 600, 'dose': 10000},
-    
-    # カルバマゼピン: Vd中等度、リバウンドあり、蛋白結合あるがOverdoseで遊離増
-    'Carbamazepine': {'V1': 0.3, 'V2': 0.8, 'Q': 0.25, 'T1/2': 24.0, 'KoA': 450, 'dose': 8000},
-    
-    # バルプロ酸: 中毒域では蛋白結合飽和→Vd増・除去率増
-    'Valproic Acid': {'V1': 0.15, 'V2': 0.25, 'Q': 0.3, 'T1/2': 18.0, 'KoA': 650, 'dose': 30000},
-    
-    # メタノール: Vdは体液量に近い。KoA最強。代謝ブロックでT1/2超延長
-    'Methanol': {'V1': 0.4, 'V2': 0.2, 'Q': 0.8, 'T1/2': 40.0, 'KoA': 900, 'dose': 40000}, 
-    
-    # リチウム: 細胞内分布(V2)からの戻りが遅い(Q小)→リバウンド最強
-    'Lithium': {'V1': 0.3, 'V2': 0.6, 'Q': 0.15, 'T1/2': 30.0, 'KoA': 850, 'dose': 5000},
-    
-    # カスタム
+    'Acyclovir': {'V1': 0.15, 'V2': 0.55, 'Q': 0.2, 'T1/2': 20.0, 'KoA': 600, 'dose': 5000},
+    'Carbamazepine': {'V1': 0.3, 'V2': 0.8, 'Q': 0.25, 'T1/2': 24.0, 'KoA': 450, 'dose': 6000},
+    'Valproic Acid': {'V1': 0.15, 'V2': 0.25, 'Q': 0.3, 'T1/2': 20.0, 'KoA': 650, 'dose': 20000},
+    'Methanol': {'V1': 0.4, 'V2': 0.2, 'Q': 0.8, 'T1/2': 40.0, 'KoA': 900, 'dose': 30000}, 
+    'Lithium': {'V1': 0.3, 'V2': 0.6, 'Q': 0.15, 'T1/2': 40.0, 'KoA': 850, 'dose': 4000},
     'Custom': {'V1': 0.2, 'V2': 0.4, 'Q': 0.3, 'T1/2': 12.0, 'KoA': 500, 'dose': 5000}
 }
 
@@ -182,11 +162,11 @@ with st.sidebar.expander("薬剤パラメータ詳細設定", expanded=True):
     
     col_k1, col_k2 = st.columns(2)
     with col_k1:
-        t_half = st.number_input("半減期 (時間)", value=float(p['T1/2']), help="中毒時・腎不全時の値を想定")
+        t_half = st.number_input("半減期 (時間)", value=float(p['T1/2']), help="下の表を参考に設定してください")
     with col_k2:
-        koa = st.number_input("KoA (mL/min)", value=int(p['KoA']), help="膜面積1.5~2.0m2想定")
+        koa = st.number_input("KoA (mL/min)", value=int(p['KoA']))
         
-    q_inter = st.slider("組織間移行クリアランス Q (L/min)", 0.01, 2.0, p['Q'], 0.01, help="小さいほどリバウンド大")
+    q_inter = st.slider("組織間移行クリアランス Q (L/min)", 0.01, 2.0, p['Q'], 0.01)
 
 current_params = {
     'V1_per_kg': v1_pk, 'V2_per_kg': v2_pk, 
@@ -221,12 +201,17 @@ if st.button("シミュレーション実行", type="primary"):
     with col1:
         fig, ax = plt.subplots(figsize=(10, 6))
         
-        # No HD
+        # --- No HD (Reference) ---
+        # Blood (No HD)
         ax.plot(time_steps/60, c1_none, label='Blood (No HD)', color='gray', linestyle=':', linewidth=2, alpha=0.6)
+        # Tissue (No HD) - 復活！
+        ax.plot(time_steps/60, c2_none, label='Tissue (No HD)', color='lightblue', linestyle=':', linewidth=1.5, alpha=0.6)
         
-        # With HD
+        # --- With HD ---
+        # Tissue (With HD)
+        ax.plot(time_steps/60, c2_hd, label='Tissue (With HD)', color='tab:blue', linestyle='--', linewidth=2, alpha=0.8)
+        # Blood (With HD) - 最前面に
         ax.plot(time_steps/60, c1_hd, label='Blood (With HD)', color='tab:red', linewidth=2.5)
-        ax.plot(time_steps/60, c2_hd, label='Tissue (With HD)', color='tab:blue', linestyle='--', linewidth=2)
         
         # HD Area
         ax.axvspan(hd_start/60, (hd_start + hd_duration)/60, color='red', alpha=0.1, label='HD Session')
@@ -236,7 +221,7 @@ if st.button("シミュレーション実行", type="primary"):
         ax.set_ylabel('Concentration (µg/mL or mg/L)')
         ax.set_xlim(0, 24)
         ax.grid(True, alpha=0.3)
-        ax.legend()
+        ax.legend(loc='upper right')
         st.pyplot(fig)
         
     with col2:
